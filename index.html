@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8">
+  <link type="text/css" rel="stylesheet" href="style.css"/>
+</head>
+
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script>
+var display = d3.select("body").append("div").attr("id", "display");
+ 
+var select = display.append("div").attr("id","listWrapper")
+  .append("select").attr({
+    "size": 29,
+    "id": "listSelect"
+  });
+      
+d3.csv("data.csv", function(error, data) {
+  select.selectAll("option").data(data).enter()
+    .append("option")
+    .text(function(d){return d.name});
+    
+  select.on("change", function() {
+    colorGrid(data[this.selectedIndex].name);
+  }) 
+ 
+  var svg = display.append("svg")
+  .attr({
+    width: "600px",
+    height: "700px"
+  });
+ 
+  //Default category
+  var catOfInterest = "Restaurants";
+   
+  //constants
+  var hourNum = d3.range(24);
+  var dayEnum = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+   
+  //style
+  var gridSize = 20; //this can't be smaller than the words for the dayEnum
+  var margin = {top: 15, left: 100};
+  var spacing = 0;
+  var maxColor = '#3333CC';
+ 
+  //draw labels and squares
+  for (var d = 0; d < dayEnum.length; d++) {
+    //day text
+    svg.append('text')
+    .attr({
+      x: margin.left + (d * gridSize) + (d * spacing) + (gridSize/2),
+      y: margin.top - 5,
+      'text-anchor' : 'middle',
+      'alignment-baseline' : 'middle',
+      'font-size': '10px'
+    })
+    .text(dayEnum[(d+1)%dayEnum.length]);
+
+    //squares
+    for (var h = 0; h < hourNum.length; h++) {
+      svg.append('rect')
+      .attr({
+        x: margin.left + (d * gridSize) + (d * spacing),
+        y: margin.top + (h * gridSize) + (h * spacing),
+        height: gridSize-1,
+        width: gridSize-1,
+        fill: 'white',
+        id: dayEnum[d].toLowerCase() + "_"+ h
+      });
+    }
+  }
+
+  //hour text
+  for (var h = 0; h < hourNum.length; h++) {
+    svg.append('text')
+    .attr({
+      x: margin.left - 2,
+      y: margin.top + (h * gridSize) + (h * spacing) + (gridSize/2),
+      'text-anchor' : 'end',
+      'alignment-baseline' : 'middle',
+          'font-size': '10px'
+    })
+    .text(h + ":00 - " + (h+1) + ":00" ); 
+  }
+  
+  //category label
+  svg.append("text")
+  .attr({
+    x: (margin.left + gridSize + ((gridSize + spacing)* dayEnum.length)),
+    y: (margin.top + ((gridSize * hourNum.length)/2)) - 20,
+    'alignment-baseline' : 'middle',
+    'font-size': '26px',
+    id : "catLabel"
+  }).text(catOfInterest);
+  
+//build legend
+var legend = svg.append('g')
+	.attr("transform", 
+         "translate(" + (margin.left + gridSize + ((gridSize + spacing)* dayEnum.length)) + "," 
+         + (margin.top + ((gridSize * hourNum.length)/2)) + ")");
+
+//min
+legend.append('rect')
+.attr({
+  x: 0,
+  y: 0, 
+  height: gridSize,
+  width: gridSize,
+  fill: 'white',
+  stroke: 'black',
+  'stroke-width': 1,
+  id: "minLegendColor"
+});
+
+legend.append('text')
+.attr({
+    x: gridSize + spacing + 5,
+    y: (gridSize/2),
+    'alignment-baseline' : 'middle',
+    'font-size': '10px',
+    id: "minLegendText"
+})
+.text('0');
+
+//mid
+legend.append('rect')
+  .attr({
+    x: 0,
+    y: gridSize + spacing, 
+    height: gridSize,
+    width: gridSize,
+    stroke: 'black',
+    'stroke-width': 1,
+    id: "midLegendColor"
+});
+
+legend.append('text')
+.attr({
+    x: gridSize + spacing + 5,
+    y: gridSize + spacing + ((gridSize + spacing)/2),
+    'alignment-baseline' : 'middle',
+    'font-size': '10px',
+  'id': 'midLegendText'
+})
+
+//max
+legend.append('rect')
+  .attr({
+    x: 0,
+    y: (gridSize + spacing) * 2, 
+    height: gridSize,
+    width: gridSize,
+    fill: maxColor,
+    stroke: 'black',
+    'stroke-width': 1,
+    id: "maxLegendColor"
+  });
+
+legend.append('text')
+.attr({
+    x: gridSize + spacing + 5,
+    y: (gridSize + spacing) * 2 + ((gridSize+spacing)/2),
+    'alignment-baseline' : 'middle',
+    'font-size': '10px',
+  'id': 'maxLegendText'
+});
+ 
+  //color for default category
+  colorGrid(catOfInterest);
+ 
+  function colorGrid(category){
+    d3.select("text#catLabel").text(category);
+    
+    //add a yellow line for the current time
+    var now = new Date();
+    //adjusted for dow starting on monday
+    var day = (now.getDay() + 6) % 7; 
+    var hour = now.getHours();
+    var minute = now.getMinutes();
+    var minuteScale = d3.scale.linear().domain([0,59]).range([0,gridSize]);
+  
+    d3.select("#timeLine").remove();
+  
+    svg.append("line").attr({
+      x1: margin.left + (day * gridSize) +(spacing * day),
+      y1: margin.top + (hour * gridSize) +(spacing * hour) + minuteScale(minute),
+      x2: margin.left + (day * gridSize) + (spacing * day) + gridSize - 1,
+      y2: margin.top + (hour * gridSize) +(spacing * hour) + minuteScale(minute),
+      stroke: '#FFAD00',
+      'stroke-width': 2,
+      id: "timeLine"
+    });
+  
+    //Color the squares and add a tooltip
+    for(var i = 0; i < data.length; i++){ 
+      if (data[i].name == category){
+        var chkMax = maxProp(data[i]); 
+        var colorScale = d3.scale.linear().domain([0,chkMax]).range(['#fff', maxColor]);
+        
+        for(var prop in data[i]){
+          var dateSq = d3.select('#' + prop);
+        
+          dateSq.transition()
+            .duration(200)
+            .ease("linear")
+            .attr({
+              fill: colorScale(data[i][prop])
+            });
+        
+          d3.select('#' + prop + ' title').remove();
+        
+          dateSq.append('title')
+          .text('Checkin Count: ' + data[i][prop]);
+        }
+        d3.select("#midLegendColor").attr("fill", colorScale(chkMax/2));
+        d3.select("#midLegendText").text(chkMax/2);
+        d3.select("#maxLegendText").text(chkMax);
+      }
+    } 
+  } 
+});
+ 
+function maxProp(d){
+  var maxPropOut = 0;
+ 
+  for(var prop in d){
+    if (prop!== 'name' & prop !== 'businessCount' & Number(d[prop]) > maxPropOut){
+      maxPropOut = Number(d[prop]);
+    } 
+  }
+  return maxPropOut;
+}
+</script>
